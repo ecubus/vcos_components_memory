@@ -1,39 +1,37 @@
-# vcos_components_memory
+# vcos_components_memory代码仓库说明
 
-#### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+## 1.代码仓库简介
 
-#### 软件架构
-软件架构说明
+存储栈是一个基于块（Block）的数据存储管理系统，支持MRAM、Flash、EEPROM等多种硬件存储介质。通过分层设计，实现了硬件无关的数据管理，满足了车载系统高可靠、高性能数据读写的需求。存储栈包括两大块，分别是数据存储服务层和存储驱动适配层
 
-
-#### 安装教程
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 使用说明
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 参与贡献
-
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+* **数据存储服务层**：数据存储服务层为应用提供了基础读写接口，此外还提供了数据一致性校验、冗余管理、容错管理和优先级队列等功能
+* **存储驱动适配层**：存储驱动适配层用于适配不同驱动，屏蔽硬件差异，为数据存储服务层提供了统一的驱动操作接口
 
 
-#### 特技
+## 2.代码目录
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+vcos_components_memory 源代码在 haloosspace/components/memory 目录下，目录结构如下图所示：
+
+```
+memory                      # 存储栈代码
+├── CMakeLists.txt          # 存储子系统顶层构建配置，定义模块编译规则
+├── DISCLAIMER.md           # 存储组件免责声明
+├── LICENSE                 # 开源协议
+├── memif                   # 存储驱动适配层，适配不同驱动
+│   ├── CMakeLists.txt      # 构建规则
+│   ├── config_plug_in      # 配置项生成文件
+│   ├── inc                 # 头文件
+│   ├── Kconfig             # memif模块使能配置
+│   └── src                 # 源文件
+├── nvm                     # 数据存储服务层，非易失性数据管理
+│   ├── CMakeLists.txt      # 构建规则
+│   ├── config_plug_in      # 配置项生成文件
+│   ├── inc                 # 头文件
+│   ├── Kconfig             # nvm模块使能配置
+│   └── src                 # 源文件
+└── README.md               # memory仓库介绍
+```
+
+
+## 3.仓库使用入门
+使用手册详见 [VCOS存储栈开发者手册](https://gitee.com/haloos/vcos/blob/master/user_manual/components/non_volatile_storage_user_manual.md)

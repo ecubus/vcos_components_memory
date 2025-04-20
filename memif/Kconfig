@@ -1,0 +1,5 @@
+config MEM_MEMIF
+    bool "mem memif support"
+    default n
+	---help---
+		Enable the MEM_MEMIF

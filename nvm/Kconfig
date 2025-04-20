@@ -1,0 +1,5 @@
+config MEM_NVM
+    bool "mem nvm support"
+    default n
+	---help---
+		Enable the MEM_NVM
