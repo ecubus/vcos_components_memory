@@ -31,7 +31,7 @@ else()
 endif()
   list(APPEND CSRCS src/crc_16.c src/crc_32.c src/nvm_crc.c src/nvm_fsm.c src/nvm_fsmact.c src/nvm_fsmevent.c src/nvm_queue.c  ${GENDATA_DIR}/NvM/nvm_cfg.c)
   # 设置该模块编译依赖的头文件路径
-  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar_os
+  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar
                    ${NUTTX_APPS_DIR}/components/rt_framework/inc
                    ${NUTTX_APPS_DIR}/components/maintaining/vcos_log/inc
                    ${NUTTX_APPS_DIR}/components/memory/memif/inc

@@ -31,7 +31,7 @@ else()
 endif()
   list(APPEND CSRCS ${GENDATA_DIR}/MemIf/memif_cfg.c)
   # 设置该模块编译依赖的头文件路径
-  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar_os
+  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar
                    ${NUTTX_APPS_DIR}/components/rt_framework/inc
                    ${NUTTX_APPS_DIR}/components/memory/memif/inc
                    ${CMAKE_CURRENT_LIST_DIR}/src
