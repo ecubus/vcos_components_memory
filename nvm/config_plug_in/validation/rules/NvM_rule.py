@@ -32,7 +32,7 @@ class NvMRule():
         nvm_dict = bsw_ecuc_cfg_class_dict['NvM']['ArPackages']['ActiveEcuC']['NvM']
 
         for validate_code in VALIDATE_MARK_LIST:
-            validate_rule_package = importlib.import_module(f'nvm.config_plug_in.validation.rules.NvM{validate_code}')
+            validate_rule_package = importlib.import_module(f'.NvM{validate_code}', __package__)
             validate_rule_class = getattr(validate_rule_package, f'NvM{validate_code}Rule')
             try:
                 bsw_module_rule_obj = validate_rule_class(self.logs, bsw_ecuc_cfg_class_dict, nvm_dict)

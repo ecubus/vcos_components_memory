@@ -19,7 +19,7 @@ NvM配置文件解析模块.
 解析输入的NvM配置文件, 然后生成模板config.json
 """
 import copy
-from base_library.autosar_utils.autosar_util import AutosarUtil
+from basic_func_module.autosar_utils.autosar_util import AutosarUtil
 from . import filter
 import hashlib
 

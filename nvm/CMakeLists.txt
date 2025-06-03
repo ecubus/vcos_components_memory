@@ -14,21 +14,11 @@
 #
 # ##############################################################################
 
-if(CONFIG_MEM_NVM) # 模块使能开关
+if(CONFIG_MODULE_NVM) # 模块使能开关
   nuttx_add_library(mem_nvm STATIC) # 当前模块编译为静态库，库名称为libautosar_os
   set(CSRCS)  # 清空CSRCS list
   set(CSRCS src/nvm.c) # 模块包含的c代码文件，包含相对当前CMakeList.txt文件的路径，如果有多个c文件，用' '分隔
   # 如果需要追加c源文件，可以用
-if(DEFINED BOARD_NAME)
-  if(${BOARD_NAME} MATCHES "A2G_TC397_5V_TFT")
-      set(GENDATA_DIR "${NUTTX_APPS_DIR}/${APPS_DIR}/platform_cfg/tc397_cfg/gen_data")
-  endif()
-  if(${BOARD_NAME} MATCHES "E3650_DEV_KIT")
-      set(GENDATA_DIR "${NUTTX_APPS_DIR}/${APPS_DIR}/platform_cfg/e3650_cfg/gen_data")
-  endif()
-else()
-  set(GENDATA_DIR "${NUTTX_APPS_DIR}/${APPS_DIR}/cfg_prj/gen_data")
-endif()
   list(APPEND CSRCS src/crc_16.c src/crc_32.c src/nvm_crc.c src/nvm_fsm.c src/nvm_fsmact.c src/nvm_fsmevent.c src/nvm_queue.c  ${GENDATA_DIR}/NvM/nvm_cfg.c)
   # 设置该模块编译依赖的头文件路径
   set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar

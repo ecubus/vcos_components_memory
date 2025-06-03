@@ -15,8 +15,8 @@
 # limitations under the License.
 # ##############################################################################
 
-from base_library.autosar_utils.utils import get_definition_ref, set_value, get_value, get_short_name,get_value_ref
-from base_library.autosar_utils.autosar_util import AutosarUtil
+from basic_func_module.autosar_utils.utils import get_definition_ref, set_value, get_value, get_short_name,get_value_ref
+from basic_func_module.autosar_utils.autosar_util import AutosarUtil
 from func_module.logger import logger
 import re
 

@@ -19,10 +19,10 @@ import os
 from copy import deepcopy
 from random import randint
 from typing import Dict
-from base_library.autosar_utils.utils import get_definition_ref, set_value, set_value_ref, get_value_ref, get_short_name, get_value
-from base_library.autosar_utils.autosar_util import AutosarUtil
-from func_module.arxml_handler.arxml_parse_save import ArxmlParseHandler
-from func_module.arxml_handler.config_comparator import ConfigComparator
+from basic_func_module.autosar_utils.utils import get_definition_ref, set_value, set_value_ref, get_value_ref, get_short_name, get_value
+from basic_func_module.autosar_utils.autosar_util import AutosarUtil
+from func_module.module_management.arxml_handler.arxml_parse_save import ArxmlParseHandler
+from func_module.module_management.arxml_handler.config_comparator import ConfigComparator
 
 CUR_DIR = os.path.dirname(__file__)
 
