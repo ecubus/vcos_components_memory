@@ -24,6 +24,7 @@
  * {{get_vcos_version()}}
  */
 {% set memmap_cfg = get_memmap_cfg() %}
+{%- if module_name in memmap_cfg['modules']%}
 {%- set ref_instance = memmap_cfg['modules'][module_name]['apps'] %}
 {%- if 0 == (ref_instance | length) %}
 /*******************************{{MODULE}} is a zero instance module****************************************/
@@ -34,6 +35,9 @@
 {%- if 1 < (ref_instance | length) %}
 /*******************************{{MODULE}} is a multi instance module***************************************/
 {%- endif %}
+{%- else %}
+/*******************************{{module_name}} is a SWC module***************************************/
+{%- endif%}
 
 #define _MEMMAP_HEADER_INCLUDE_TAG
 

@@ -1,7 +1,7 @@
 
 #ifndef __OS_MEMPOOL_CFG_H_
 #define __OS_MEMPOOL_CFG_H_
-#include "os_mempool.h"
+#include "rtfw_mempool.h"
 
 {%- for module_name in os_mempool_all_cfg["module_cfg"]  %}
 extern const os_mempool_module_cfg_t osmempool_module_{{module_name | lower}}_cfg;
@@ -11,6 +11,9 @@ extern const os_mempool_module_cfg_t osmempool_module_{{module_name | lower}}_cf
 extern const os_mempool_cfg_t osmempool_{{pool_name}}_cfg;
 {%- endfor %}
 
+#if (CONFIG_RT_FRAMEWORK_MEMPOOL == 1)
+extern const os_mempool_module_entry_t mempool_module_map[];
+#endif
 
 {%- for module_name in os_mempool_all_cfg["module_cfg"]  %}
 	{%- if module_name|lower != "os" %}

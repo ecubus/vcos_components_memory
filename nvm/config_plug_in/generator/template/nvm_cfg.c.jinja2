@@ -30,7 +30,7 @@
 {% endif %}
 
 {%- for FileName in get_nvm_includefiles() %}
-#include "{{FileName}}"
+#include "{{FileName.lower()}}"
 {%- endfor %}
 
 #define NVM_START_SEC_PRIVATE_DATA

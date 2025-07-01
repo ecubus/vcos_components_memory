@@ -1,7 +1,7 @@
 #include <nuttx/config.h>
 #include "Os.h"
 #include "Os_Types.h"
-#include "os_mempool.h"
+#include "rtfw_mempool.h"
 #include "mempool_cfg.h"
 #include "application_cfg.h"
 #include "core_cfg.h"
@@ -21,22 +21,22 @@
 
     {%- if pool_type == "OS_MEMPOOLTYPE_PRIVATE" or "OS_MEMPOOLTYPE_CORE" in pool_type  %}
 #define OS_START_SEC_{{app_name.upper()}}_PRIVATE_BSW_BSS
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 static VAR(uint8, OS_{{app_name.upper()}}_PRIVATE_BSW_BSS) osmempool_{{pool_name}}_buffer[ {{memblock_count}}*OS_MEMPOOL_ADDR_ROUNDUP({{memblock_size}} + OS_MEMPOOL_ADDR_ROUNDUP(sizeof(os_mempool_block_t), {{mem_alignment}}), {{mem_alignment}}) + {{mem_alignment}}];
 static VAR(os_mempool_inst_t, OS_{{app_name.upper()}}_PRIVATE_BSW_BSS) osmempool_{{pool_name}}_inst;
 #define OS_STOP_SEC_{{app_name.upper()}}_PRIVATE_BSW_BSS
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
     {%- else %}
 #define OS_START_SEC_ALL_APPS_MULTI_APP_SHARE_BSW_BSS
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 static VAR(uint8, OS_ALL_APPS_MULTI_APP_SHARE_BSW_BSS) osmempool_{{pool_name}}_buffer[ {{memblock_count}}*OS_MEMPOOL_ADDR_ROUNDUP({{memblock_size}} + OS_MEMPOOL_ADDR_ROUNDUP(sizeof(os_mempool_block_t), {{mem_alignment}}), {{mem_alignment}}) + {{mem_alignment}}];
 static VAR(os_mempool_inst_t, OS_ALL_APPS_MULTI_APP_SHARE_BSW_BSS) osmempool_{{pool_name}}_inst;
 #define OS_STOP_SEC_ALL_APPS_MULTI_APP_SHARE_BSW_BSS
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
     {%- endif %}
 
 #define OS_START_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 CONST(os_mempool_cfg_t, OS_CONST) osmempool_{{pool_name}}_cfg = {
     .obj_desc = &osmempool_{{pool_name}}_inst,
 {%- if pool_type == "OS_MEMPOOLTYPE_GLOBAL"  %}
@@ -60,7 +60,7 @@ CONST(os_mempool_cfg_t, OS_CONST) osmempool_{{pool_name}}_cfg = {
     .block_start = osmempool_{{pool_name}}_buffer,
 };
 #define OS_STOP_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 {%- endfor %}
 
 
@@ -71,7 +71,7 @@ CONST(os_mempool_cfg_t, OS_CONST) osmempool_{{pool_name}}_cfg = {
     {%- set osmempool_cfg_list = module_cfg["mempool_cfg_list"]  %}
 
 #define OS_START_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 static CONSTP2CONST(os_mempool_cfg_t, AUTOMATIC, OS_CONST) {{module_name | lower}}_osmempool_cfg_list[] = {
     {%- for pool_cfg in osmempool_cfg_list %}
     &osmempool_{{pool_cfg["name"]}}_cfg,
@@ -84,13 +84,24 @@ CONST(os_mempool_module_cfg_t, OS_CONST) osmempool_module_{{module_name | lower}
     .pools = {{module_name | lower}}_osmempool_cfg_list,
 };
 #define OS_STOP_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 {%- endfor %}
 
+#define OS_START_SEC_CONST
+#include "rtfw_memmap.h"
+CONST(os_mempool_module_entry_t, OS_CONST) mempool_module_map[] = {
+{%- set os_mempool_module_cfg = os_mempool_all_cfg["module_cfg"] %}
+{%- for module_name in os_mempool_module_cfg  %}
+    { "{{module_name}}", &osmempool_module_{{module_name | lower}}_cfg },
+{%- endfor %}
+    { NULL, NULL }
+};
+#define OS_STOP_SEC_CONST
+#include "rtfw_memmap.h"
 
 {%- set os_mempool_type_cfg = os_mempool_all_cfg["type_cfg"] %}
 #define OS_START_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 {%- for app_name in os_mempool_type_cfg["private"] %}
 static CONSTP2CONST(os_mempool_cfg_t, AUTOMATIC, OS_CONST) {{app_name}}_os_private_mempools[] = {
 {%- for pool_cfg in os_mempool_type_cfg["private"][app_name] %}
@@ -115,5 +126,5 @@ CONSTP2CONST(os_mempool_cfg_t, AUTOMATIC, OS_CONST) os_global_mempools[] = {
 };
 
 #define OS_STOP_SEC_CONST
-#include "os_memmap.h"
+#include "rtfw_memmap.h"
 #endif

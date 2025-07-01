@@ -42,14 +42,26 @@ def generate_memmap(env_ui, config):
     template = env_ui.get_template("module_memmap.h.jinja2")
     generate_memmap_module_header(template, memmap_output_dir, config)
 
-    template = env_ui.get_template("memmap.h.jinja2")
-    render_os_template(template, memmap_output_dir, "memmap.h", config)
-
     template = env_ui.get_template("memmap_int.h.jinja2")
     render_os_template(template, memmap_output_dir, "memmap_int.h", config)
 
-    template = env_ui.get_template("os_compiler_cfg.h.jinja2")
-    render_os_template(template, memmap_output_dir, "os_compiler_cfg.h", config)
+    template = env_ui.get_template("rtfw_compiler_cfg.h.jinja2")
+    render_os_template(template, memmap_output_dir, "rtfw_compiler_cfg.h", config)
+
+def generate_autosar_memmap_module_header(template, out_dir, config):
+    memmap_cfg = context.Function.get_memmap_cfg(config)
+    gen_modules = memmap_cfg['swc_modules']
+    for mod_name in gen_modules.keys():
+        gen_file_name = f'{mod_name}_MemMap.h'
+        module_config = {**config, 'module_name': mod_name}
+        render_os_template(template, out_dir, gen_file_name, module_config)
+
+def generate_autosar_style_memmap(env_ui, config):
+    memmap_output_dir = os.path.realpath(os.path.join(config['sys_cfg']['gendata_path'], "Appl"))
+    if not os.path.exists(memmap_output_dir):
+        os.makedirs(memmap_output_dir)
+    template = env_ui.get_template("module_memmap.h.jinja2")
+    generate_autosar_memmap_module_header(template, memmap_output_dir, config)
 
 def generate_ld_scripts(env_ui, config):
     memmap_output_dir = os.path.realpath(os.path.join(config['sys_cfg']['gendata_path'], "scripts"))
@@ -58,6 +70,7 @@ def generate_ld_scripts(env_ui, config):
 
     compiler_name = config['sys_cfg']['compiler']
     target_name = config['sys_cfg']['target']
+
     # We provide special jinja2 template to meet platform specific requirements
     if target_name == 'E3650':
         template = env_ui.get_template(f"ld_scripts_{compiler_name}_e3650.ld.jinja2")
@@ -146,6 +159,11 @@ def generate_dynamic_code(sys_config: dict, config_dict: dict):
     #    MemMap                                          #
     # ################################################## #
     generate_memmap(env_ui, config)
+
+    # ################################################## #
+    #   Autosar CP MemMap                                #
+    # ################################################## #
+    generate_autosar_style_memmap(env_ui, config)
 
     # ################################################## #
     #    ld script                                       #

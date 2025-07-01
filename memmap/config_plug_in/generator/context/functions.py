@@ -126,6 +126,45 @@ def gen_memmap_internal_info(apps, attr_pairs, layers):
                 ret[map_key] = map_val
     return ret
 
+
+def gen_autosar_flash_map_info(layer, apps, calib_app):
+    app = apps[0]
+    ret = [
+        format_map_info("CALLOUT_CODE", f'{app}_CODE_{layer}_TEXT'),
+        format_map_info("CODE", f'{app}_CODE_{layer}_TEXT'),
+        format_map_info("CONST_UNSPECIFIED", f'{app}_CONST_{layer}_RODATA'),
+        format_map_info("CALIB_CONST_UNSPECIFIED", f'{calib_app}_CALIBRATION_{layer}_RODATA')
+    ]
+    return ret
+
+def gen_autosar_single_app_map_info(layer, apps):
+    ret = []
+    var_scope_property_map = {
+        "PRIVATE":"PRIVATE",
+        "SEMISHARED":"SEMISHARED"
+    }
+
+    data_type_mapping = {
+        'VAR_INIT_UNSPECIFIED': 'DATA',
+        'VAR_ZERO_INIT_UNSPECIFIED': 'DATA',
+        'VAR_NO_INIT_UNSPECIFIED': 'BSS'
+    }
+    def __append_as_map_info():
+        ret.append(format_map_info(f'{scope_key}_{d_type}',
+                                   f'{app}_{scope_val}_{layer}_{d_type_inner}'))
+    app = apps[0]
+    for scope_key, scope_val in var_scope_property_map.items():
+        for d_type, d_type_inner in data_type_mapping.items():
+            __append_as_map_info()
+
+    scope_key = 'SHARED'
+    scope_val = 'MULTI_APP_SHARE'
+    app = 'ALL_APPS'
+    for d_type, d_type_inner in data_type_mapping.items():
+        __append_as_map_info()
+
+    return ret
+
 class Function(FunctionBase):
     _cache = []
     @staticmethod
@@ -175,6 +214,21 @@ class Function(FunctionBase):
 
     @staticmethod
     @pass_context
+    def get_autosar_memmap_module_dict(context, use_layer):
+        asw_config = OsUtils.get_dict_path(context, ['config_dict', 'rte', 'asw_config'])
+        ret = {}
+
+        for swc_name, swc_cfg in asw_config.items():
+            ret[swc_name] = {
+                'use_calib': True,
+                'apps': [swc_cfg['osapplication']],
+                'standard': 'autosar',
+                'layer': use_layer
+            }
+        return ret
+
+    @staticmethod
+    @pass_context
     @OsUtils.cache_once(_cache)
     def get_memmap_cfg(context):
         internal_layer = ''
@@ -208,6 +262,7 @@ class Function(FunctionBase):
         memmap_cfg = {
             "layers": layer_dict,
             "modules": module_dict,
+            "swc_modules": Function.get_autosar_memmap_module_dict(context, internal_layer),
             "internal_layer": internal_layer,
             "bsw_apps":bsw_apps_list
         }
@@ -218,7 +273,14 @@ class Function(FunctionBase):
     @pass_context
     def get_memmap_info(context, module):
         memmap_cfg = Function.get_memmap_cfg(context)
-        mod_cfg = memmap_cfg['modules'][module]
+
+        if module in memmap_cfg['modules']:
+            mod_cfg = memmap_cfg['modules'][module]
+            use_rtfw_style = True
+        else:
+            mod_cfg = memmap_cfg['swc_modules'][module]
+            use_rtfw_style = False    # use autosar style
+
         ref_apps = mod_cfg['apps']
         ref_layer = mod_cfg['layer']
 
@@ -228,19 +290,24 @@ class Function(FunctionBase):
 
         memmap_info = []
 
-        memmap_info += gen_flash_map_info(ref_layer, ref_apps)
-        if mod_cfg['use_calib']:
-            memmap_info += gen_calib_map_info(ref_layer, default_calib_app)
+        if use_rtfw_style:
+            memmap_info += gen_flash_map_info(ref_layer, ref_apps)
+            if mod_cfg['use_calib']:
+                memmap_info += gen_calib_map_info(ref_layer, default_calib_app)
 
-        if len(ref_apps) == 0:
-            memmap_info += gen_no_app_map_info(ref_layer)
-        elif len(ref_apps) == 1:
-            memmap_info += gen_single_app_map_info(ref_layer, ref_apps)
+            if len(ref_apps) == 0:
+                memmap_info += gen_no_app_map_info(ref_layer)
+            elif len(ref_apps) == 1:
+                memmap_info += gen_single_app_map_info(ref_layer, ref_apps)
+            else:
+                memmap_info += gen_multi_app_map_info(ref_layer, ref_apps)
+
+            gen_bsw_apps = [x for x in memmap_cfg['bsw_apps'] if x not in ref_apps]
+            memmap_info += gen_common_bsw_app_map_info(ref_layer, gen_bsw_apps)
+
         else:
-            memmap_info += gen_multi_app_map_info(ref_layer, ref_apps)
-
-        gen_bsw_apps = [x for x in memmap_cfg['bsw_apps'] if x not in ref_apps]
-        memmap_info += gen_common_bsw_app_map_info(ref_layer, gen_bsw_apps)
+            memmap_info += gen_autosar_flash_map_info(ref_layer, ref_apps, default_calib_app)
+            memmap_info += gen_autosar_single_app_map_info(ref_layer, ref_apps)
 
         ret_info = {'mapping_info': memmap_info}
 
@@ -325,6 +392,24 @@ class Function(FunctionBase):
 
     @staticmethod
     @pass_context
+    @OsUtils.cache_once(_cache)
+    def get_app_hook_stacks_sections(context):
+        ret_key = []
+        ret_values = []
+        memmap_cfg = Function.get_memmap_cfg(context)
+        internal_layer = memmap_cfg['internal_layer']
+        app_cfg = OsFunction.get_app_cfg(context)
+
+        all_apps_hook_cfg = OsFunction.get_app_hook_cfg(context)
+        for app_name, app_hook_cfg in all_apps_hook_cfg.items():
+            for hook_cfg in app_hook_cfg.values():
+                ret_key.append(hook_cfg['stack_name'])
+                ret_values.append(f'.bss.core{app_cfg[app_name]["CoreNumber"]}_stack.{hook_cfg["app_hook_name"]}.{internal_layer}'.lower())
+
+        return dict(zip(ret_key, ret_values))
+
+    @staticmethod
+    @pass_context
     def get_global_sections(context):
         memmap_cfg = Function.get_memmap_cfg(context)
         internal_layer = memmap_cfg['internal_layer']
@@ -375,11 +460,19 @@ class Function(FunctionBase):
     @staticmethod
     @pass_context
     @OsUtils.cache_once(_cache)
-    def group_ld_config_by_attribute(context):
+    def get_all_map_targets(context):
         memmap_cfg = Function.get_memmap_internal_cfg(context)
         map_targets = list(set(memmap_cfg.values()))
         map_targets += Function.get_task_stacks_sections(context).values()
         map_targets += Function.get_hook_stacks_sections(context).values()
+        map_targets += Function.get_app_hook_stacks_sections(context).values()
+        return map_targets
+
+    @staticmethod
+    @pass_context
+    @OsUtils.cache_once(_cache)
+    def group_ld_config_by_attribute(context):
+        map_targets = Function.get_all_map_targets(context)
         cfg_list = []
 
         for map_val in map_targets:
@@ -419,6 +512,10 @@ class Function(FunctionBase):
                 for hook_name, hook_val in hook_cfg.items():
                     if hook_val['enabled'] == True:
                         target_owner += [hook_name]
+                all_apps_hook_cfg = OsFunction.get_app_hook_cfg(context)
+                for app in target_apps:
+                    for hook_cfg in all_apps_hook_cfg[app].values():
+                        target_owner.append(hook_cfg['app_hook_name'])
 
         cfg_dict = {}
         for t_owner in target_owner:
@@ -429,9 +526,7 @@ class Function(FunctionBase):
     @pass_context
     def get_all_ram_section_config(context):
         ret = []
-        memmap_cfg = Function.get_memmap_internal_cfg(context)
-        map_targets = list(set(memmap_cfg.values()))
-        map_targets += Function.get_task_stacks_sections(context)
+        map_targets = Function.get_all_map_targets(context)
 
         for cfg in map_targets:
             if context['target_data_type'] in cfg:

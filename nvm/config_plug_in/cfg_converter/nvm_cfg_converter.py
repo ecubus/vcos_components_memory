@@ -254,8 +254,8 @@ class NvmCfgConverterwithCdd(NvmCfgConverter):
         container_obj = new_nvm_ddd.find("/InitialEcuC/NvM/NvMCommonVendorParams")
         param_def = self.mod_autosar_dict["NvM"].find(
             "/AUTOSAR/EcucDefs/NvM/NvMCommonVendorParams/NvMCfgCbkIncludeList")
-        self.remove_textual_param_value(param_def, container_obj, "Dem.h")
-        self.add_param_value(param_def, container_obj, "Dem.h")
+        self.remove_textual_param_value(param_def, container_obj, "dem.h")
+        self.add_param_value(param_def, container_obj, "dem.h")
 
         for block_dict in block_list:
             nvm_block_info_dict["short_name"] = block_dict['shortname']

@@ -21,7 +21,8 @@ if(CONFIG_MODULE_MEMIF) # 模块使能开关
   # 如果需要追加c源文件，可以用
   list(APPEND CSRCS ${GENDATA_DIR}/MemIf/memif_cfg.c)
   # 设置该模块编译依赖的头文件路径
-  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/autosar
+  set(INCLUDE_DIRS ${NUTTX_APPS_DIR}/components/include/
+                   ${NUTTX_APPS_DIR}/components/include/autosar
                    ${NUTTX_APPS_DIR}/components/rt_framework/inc
                    ${NUTTX_APPS_DIR}/components/memory/memif/inc
                    ${CMAKE_CURRENT_LIST_DIR}/src
