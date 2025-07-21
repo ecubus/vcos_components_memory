@@ -509,13 +509,16 @@ class Function(FunctionBase):
                     target_owner += [x.lower() for x in app_cfgs[app]['AppTaskList']]
             if 'unspecified_hook' in context['owner']:
                 hook_cfg, _ = OsFunction.get_os_hook_cfg(context)
-                for hook_name, hook_val in hook_cfg.items():
-                    if hook_val['enabled'] == True:
-                        target_owner += [hook_name]
-                all_apps_hook_cfg = OsFunction.get_app_hook_cfg(context)
-                for app in target_apps:
-                    for hook_cfg in all_apps_hook_cfg[app].values():
-                        target_owner.append(hook_cfg['app_hook_name'])
+                if hook_cfg["os_sharehook"]["enabled"]:
+                    target_owner += ["os_sharehook"]
+                else:
+                    for hook_name, hook_val in hook_cfg.items():
+                        if hook_name != "os_sharehook" and hook_val['enabled'] == True:
+                            target_owner += [hook_name]
+                    all_apps_hook_cfg = OsFunction.get_app_hook_cfg(context)
+                    for app in target_apps:
+                        for hook_cfg in all_apps_hook_cfg[app].values():
+                            target_owner.append(hook_cfg['app_hook_name'])
 
         cfg_dict = {}
         for t_owner in target_owner:
