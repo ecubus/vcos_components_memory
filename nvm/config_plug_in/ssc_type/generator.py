@@ -22,7 +22,7 @@
 import os
 import inspect
 from . import context
-from func_module.logger import logger
+from func_module.health_monitor.logger import logger
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, UndefinedError
 
 CUR_FILE_PATH = os.path.dirname(__file__)

@@ -369,6 +369,13 @@ class Function(FunctionBase):
             ret_values += [(f'.bss.core{core_id}_stack.{x}.{internal_layer}').lower() for x in task_list]
             ret_key += [task_cfg[x]['TaskStackSection'] for x in task_list]
 
+        """ add share task stack section """
+        task_stack_sharing_info, task_stack_sharing_ref = OsFunction.get_task_stack_sharing(context)
+        for core_id , combs in task_stack_sharing_info.items():
+            for comb, comb_value in combs.items():
+                ret_values.append(f'.bss.core{core_id}_stack.{comb}.{internal_layer}'.lower())
+                ret_key.append(f'OS_CORE{core_id}_{comb.upper()}_STACK_SECTION')
+
         return dict(zip(ret_key, ret_values))
 
     @staticmethod
@@ -494,6 +501,7 @@ class Function(FunctionBase):
     def get_ld_config(context):
         ld_cfg_dict = Function.group_ld_config_by_attribute(context)
         target_scope_ld_cfg = ld_cfg_dict.get(context['scope'], {})
+        task_stack_sharing_info, task_stack_sharing_ref = OsFunction.get_task_stack_sharing(context)
         if not target_scope_ld_cfg:
             return {}
 
@@ -507,6 +515,10 @@ class Function(FunctionBase):
                 app_cfgs = OsFunction.get_app_cfg(context)
                 for app in target_apps:
                     target_owner += [x.lower() for x in app_cfgs[app]['AppTaskList']]
+                """ add share task stack section """
+                combs = task_stack_sharing_info.get(context['core'][-1], {})
+                for comb, comb_value in combs.items():
+                    target_owner += [f'{comb.lower()}']
             if 'unspecified_hook' in context['owner']:
                 hook_cfg, _ = OsFunction.get_os_hook_cfg(context)
                 if hook_cfg["os_sharehook"]["enabled"]:
