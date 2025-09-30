@@ -22,11 +22,25 @@
 #include "vcos_log.h"
 #include "nvm_vcos_log.h"
 
+#define NVM_START_SEC_CONST
+#include "nvm_memmap.h"
+
+CONST(nvm_request_result_type, NVM_CONST)
+Nvm_ResultMap[MEMIF_BLOCK_INVALID + 1u] = { [MEMIF_JOB_OK] = NVM_REQ_OK,
+					    [MEMIF_JOB_FAILED] = NVM_REQ_NOT_OK,
+					    [MEMIF_JOB_PENDING] = NVM_REQ_NOT_OK,
+					    [MEMIF_JOB_CANCELED] = NVM_REQ_NOT_OK,
+					    [MEMIF_BLOCK_INCONSISTENT] = NVM_REQ_INTEGRITY_FAILED,
+					    [MEMIF_BLOCK_INVALID] = NVM_REQ_NV_INVALIDATED };
+#define NVM_STOP_SEC_CONST
+#include "nvm_memmap.h"
+
 #define NVM_START_SEC_CODE
 #include "nvm_memmap.h"
 
 static FUNC(void, NVM_CODE) nvm_get_result_and_update(uint8 dev_id)
 {
+	nvm_current_block_info.last_result = Nvm_ResultMap[(uint32)memif_get_job_result(dev_id)];
 }
 
 static FUNC(boolean, NVM_CODE) nvm_event_crc_match(void)

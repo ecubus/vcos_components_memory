@@ -135,6 +135,18 @@ FUNC(void, NVM_CODE) nvm_write_all(void)
 
 FUNC(void, NVM_CODE) nvm_set_block_lock_status(nvm_block_id_t block_id, boolean block_locked)
 {
+	DET_VALIDATE_NO_RV((nvm_task_state != NVM_FSM_UNINIT), NVM_NVM_SET_BLOCK_LOCK_STATUS_NVM_E_NOT_INITIALIZED);
+	DET_VALIDATE_NO_RV(block_id < NVM_NUM_OF_NVRAM_BLOCKS, NVM_NVM_SET_BLOCK_LOCK_STATUS_NVM_E_PARAM_BLOCK_ID);
+	DET_VALIDATE_NO_RV((nvm_admin_block_table[block_id].error_status != NVM_REQ_PENDING),
+			   NVM_NVM_SET_BLOCK_LOCK_STATUS_NVM_E_BLOCK_PENDING);
+
+	SchM_Enter_NVM_EXCLUSIVE_AREA_0();
+	if (block_locked) {
+		nvm_admin_block_table[block_id].attributes |= NVM_SET_LOCK_STATUS;
+	} else {
+		nvm_admin_block_table[block_id].attributes &= NVM_CLEAR_LOCK_STATUS;
+	}
+	SchM_Exit_NVM_EXCLUSIVE_AREA_0();
 }
 
 FUNC(Std_ReturnType, NVM_CODE) nvm_read_block(nvm_block_id_t block_id, void *dst_ptr)
@@ -179,7 +191,50 @@ FUNC(Std_ReturnType, NVM_CODE) nvm_read_block(nvm_block_id_t block_id, void *dst
  */
 FUNC(Std_ReturnType, NVM_CODE) nvm_write_block(nvm_block_id_t block_id, const void *src_ptr)
 {
+	nvm_queue_data_t queue_entry;
+	Std_ReturnType result = E_NOT_OK;
+
+	DET_VALIDATE_RV(nvm_task_state != NVM_FSM_UNINIT, NVM_NVM_WRITE_BLOCK_NVM_E_NOT_INITIALIZED, E_NOT_OK);
+	DET_VALIDATE_RV(block_id < NVM_NUM_OF_NVRAM_BLOCKS, NVM_NVM_WRITE_BLOCK_NVM_E_PARAM_BLOCK_ID, E_NOT_OK);
+
+	nvm_admin_block_type *adm_ptr = &nvm_admin_block_table[block_id];
+
+	DET_VALIDATE_RV(adm_ptr->data_index < nvm_block_descriptor_list[block_id].nv_block_num,
+			NVM_NVM_WRITE_BLOCK_NVM_E_PARAM_BLOCK_DATA_IDX, E_NOT_OK);
+	DET_VALIDATE_RV((adm_ptr->attributes & NVM_SET_WRITE_PROTECTION_STATUS) == 0u, NVM_NVM_WRITE_BLOCK_NVM_E_NV_WRITE_PROTECTED,
+			E_NOT_OK);
+	DET_VALIDATE_RV((adm_ptr->attributes & NVM_SET_LOCK_STATUS) == 0u, NVM_NVM_WRITE_BLOCK_NVM_E_BLOCK_LOCKED,
+			E_NOT_OK);
+	DET_VALIDATE_RV(!((src_ptr == NULL) && (nvm_block_descriptor_list[block_id].ram_block_data_address == NULL) &&
+			  (nvm_block_descriptor_list[block_id].cbk_get_mirror_func_pt == NULL)),
+			NVM_NVM_WRITE_BLOCK_NVM_E_PARAM_ADDRESS, E_NOT_OK);
+	DET_VALIDATE_RV((adm_ptr->error_status != NVM_REQ_PENDING), NVM_NVM_WRITE_BLOCK_NVM_E_BLOCK_PENDING, E_NOT_OK);
+
+	queue_entry.service_id = NVM_INT_FID_WRITE_BLOCK;
+	queue_entry.block_id = block_id;
+	queue_entry.data_ptr = (uint8 *)src_ptr;
+#if (NVM_JOB_PRIORIZATION == STD_ON)
+	queue_entry.job_prio = nvm_block_descriptor_list[block_id].block_job_priority;
+#endif
+	result = nvm_queue_push(&queue_entry);
+	if (result == E_OK) {
+		SchM_Enter_NVM_EXCLUSIVE_AREA_0();
+		adm_ptr->error_status = NVM_REQ_PENDING;
+		adm_ptr->attributes |= (NVM_CHANGED_STATE_SET | NVM_VALID_STATE_SET);
+		SchM_Exit_NVM_EXCLUSIVE_AREA_0();
+	} else {
+		NVM_DET_REPORTERROR(NVM_NVM_WRITE_BLOCK_NVM_E_LIST_OVERFLOW);
+
+		write_block_call_cnt++;
+		(void)VCOS_LOG(NVM_MODULE_ID, VCOS_LOG_ERROR, NVM_DLT_SYS_WRITEBLOCK, block_id, E_NOT_OK,
+			       write_block_call_cnt);
+
+		return E_NOT_OK;
+	}
+
 	write_block_call_cnt++;
+	(void)VCOS_LOG(NVM_MODULE_ID, VCOS_LOG_INFO, NVM_DLT_SYS_WRITEBLOCK, block_id, E_OK, write_block_call_cnt);
+
 	return E_OK;
 }
 

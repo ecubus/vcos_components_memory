@@ -63,6 +63,21 @@ static FUNC(void, NVM_CODE) nvm_update_admin_block_zero_status(nvm_request_resul
 static FUNC(boolean, NVM_CODE) nvm_block_need_write(nvm_admin_block_type *adm, const nvm_block_descriptor_type *desc)
 {
 	boolean ret = FALSE;
+	boolean is_selected_for_write_all =
+		(boolean)(((adm->attributes & (NVM_SET_WRITE_PROTECTION_STATUS | NVM_SET_LOCK_STATUS)) == 0u) &&
+			  ((desc->flags & NVM_SELECT_BLOCK_FOR_WRITEALL_ON) != 0u));
+	if (is_selected_for_write_all) {
+#if (NVM_ENABLE_SET_RAM_BLOCK_STATUS_API == STD_ON)
+		if ((desc->flags & NVM_BLOCK_USE_SET_RAM_BLOCK_STATUS_ON) != 0u) {
+			ret = (boolean)((adm->attributes & (NVM_CHANGED_STATE_SET | NVM_VALID_STATE_SET)) ==
+					(NVM_CHANGED_STATE_SET | NVM_VALID_STATE_SET));
+		} else {
+			ret = TRUE;
+		}
+#else
+		ret = TRUE;
+#endif
+	}
 	return ret;
 }
 
@@ -439,6 +454,35 @@ static FUNC(void, NVM_CODE) nvm_act_nop(void)
 
 static FUNC(void, NVM_CODE) nvm_act_get_high_prio_job(void)
 {
+#if (NVM_JOB_PRIORIZATION == STD_ON)
+	Std_ReturnType result = E_NOT_OK;
+
+	if (nvm_task_state == NVM_FSM_NORMAL_PRIO_JOB_1) {
+		if (memif_get_status(nvm_current_block_info.Descriptor_pt->nvram_device_id) == MEMIF_BUSY) {
+			memif_cancel(nvm_current_block_info.Descriptor_pt->nvram_device_id);
+		}
+		(void)nvm_queue_push(&nvm_queue_entry);
+	}
+	result = nvm_queue_pop(&nvm_high_job_queue, &nvm_queue_entry);
+
+	if (result == E_OK) {
+		nvm_current_block_info.Descriptor_pt = &nvm_block_descriptor_list[nvm_queue_entry.block_id];
+		nvm_current_block_info.nv_block_id = nvm_current_block_info.Descriptor_pt->nv_block_base_number;
+		nvm_current_block_info.mngmt_ptr = &nvm_admin_block_table[nvm_queue_entry.block_id];
+		nvm_current_block_info.ram_addr = nvm_queue_entry.data_ptr;
+		nvm_current_job.job_service_id = nvm_queue_entry.service_id;
+		nvm_current_job.job_block_id = nvm_queue_entry.block_id;
+
+		if (nvm_current_job.job_service_id == NVM_INT_FID_WRITE_BLOCK) {
+			nvm_subtask_state = NVM_FSM_WRITE_INIT;
+		} else {
+			nvm_current_block_info.last_result = NVM_REQ_CANCELED;
+		}
+
+		nvm_block_notification(nvm_current_job.job_block_id, nvm_service_table[nvm_current_job.job_service_id],
+				       nvm_current_block_info.mngmt_ptr->error_status);
+	}
+#endif
 }
 
 static FUNC(void, NVM_CODE) nvm_act_get_normal_prio_job(void)
@@ -514,6 +558,26 @@ static FUNC(void, NVM_CODE) nvm_act_add_tried_times(void)
 
 static FUNC(void, NVM_CODE) nvm_update_compare_crc_data(nvm_request_result_type job_result)
 {
+	const nvm_block_descriptor_type *desc = nvm_current_block_info.Descriptor_pt;
+	nvm_admin_block_type *adm = nvm_current_block_info.mngmt_ptr;
+
+	if ((desc->flags & NVM_CRC_COMP_MECHANISM_ON) != 0u) {
+		if (job_result == NVM_REQ_OK) {
+			if (desc->block_crc_type == NVM_CRC16_ON) {
+				adm->crc_compare_val.crc16 = adm->ram_crc.crc16;
+			} else {
+				adm->crc_compare_val.crc32 = adm->ram_crc.crc32;
+			}
+			adm->crc_compare_valid = TRUE;
+		} else {
+			if (desc->block_crc_type == NVM_CRC16_ON) {
+				adm->crc_compare_val.crc16 = 0xffffU;
+			} else {
+				adm->crc_compare_val.crc32 = 0xffffffffU;
+			}
+			adm->crc_compare_valid = FALSE;
+		}
+	}
 }
 
 FUNC(void, NVM_CODE)

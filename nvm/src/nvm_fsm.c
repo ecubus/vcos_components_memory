@@ -36,16 +36,126 @@ nvm_service_table[NVM_INT_FID_INVALID_JOB + 1u] = {
 	NVM_WRITE_ALL,	 NVM_READ_ALL_SID,	 NVM_MAIN_FUNCTION_SID,	     NVM_CANCEL_JOBS_SID
 };
 
-#define DUMMY_VALUE {{0xAA, 0x55, 0xAA}, { 0x55, 0xAA }}
+#define NVM_STATE(_ev_true, _act_true, _next_true, _act_false, _next_false)                                            \
+	{                                                                                                              \
+		{ (_ev_true), (_act_true), (_next_true) },                                                             \
+		{                                                                                                      \
+			(_act_false), (_next_false)                                                                    \
+		}                                                                                                      \
+	}
+
+#define NVM_STATE_WAIT_NV(_exec_action_on_idle, _next_on_idle, _self_state)                                            \
+	NVM_STATE(NVM_EVENT_NV_BUSY, NVM_ACT_Wait, (_self_state), (_exec_action_on_idle), (_next_on_idle))
 
 static CONST(nvm_state_descr_type, NVM_CONST) nvm_state_descr_table_at[] = {
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE, DUMMY_VALUE,
-DUMMY_VALUE, DUMMY_VALUE};
+	/* NVM_FSM_UNINIT */
+	NVM_STATE(NVM_EVENT_TRUE, NVM_ACT_Wait, NVM_FSM_UNINIT, NVM_ACT_Wait, NVM_FSM_UNINIT),
+
+	/* NVM_FSM_IDLE */
+	NVM_STATE(NVM_EVENT_HAVE_JOB, NVM_ACT_Nop, NVM_FSM_HAVE_JOB, NVM_ACT_Wait, NVM_FSM_IDLE),
+
+	/* NVM_FSM_HAVE_JOB */
+	NVM_STATE(NVM_EVENT_HAVE_HIGHPRIO_JOB, NVM_ACT_GetHighPrioJob, NVM_FSM_HIGH_PRIO_JOB, NVM_ACT_Nop,
+		  NVM_FSM_NOTHIGHPRIO_JOB),
+
+	/* NVM_FSM_HIGH_PRIO_JOB */
+	NVM_STATE(NVM_EVENT_SUBTASK_RUNNING, NVM_ACT_Nop, NVM_FSM_HIGH_PRIO_JOB, NVM_ACT_FinishBlock, NVM_FSM_IDLE),
+
+	/* NVM_FSM_NOTHIGHPRIO_JOB */
+	NVM_STATE(NVM_EVENT_NORMAL_PRIO_JOB, NVM_ACT_GetNormalPrioJob, NVM_FSM_NORMAL_PRIO_JOB_1, NVM_ACT_Nop,
+		  NVM_FSM_MULTI_BLOCK_JOB),
+
+	/* NVM_FSM_NORMAL_PRIO_JOB_1 */
+	NVM_STATE(NVM_EVENT_HAVE_HIGHPRIO_JOB, NVM_ACT_GetHighPrioJob, NVM_FSM_HIGH_PRIO_JOB, NVM_ACT_Nop,
+		  NVM_FSM_NORMAL_PRIO_JOB_2),
+
+	/* NVM_FSM_NORMAL_PRIO_JOB_2 */
+	NVM_STATE(NVM_EVENT_SUBTASK_RUNNING, NVM_ACT_Nop, NVM_FSM_NORMAL_PRIO_JOB_1, NVM_ACT_FinishBlock, NVM_FSM_IDLE),
+
+	/* NVM_FSM_MULTI_BLOCK_JOB */
+	NVM_STATE(NVM_EVENT_HAVEWRITEALL_JOB, NVM_ACT_StartWriteAll, NVM_FSM_WRITEALL_PROC_1, NVM_ACT_StartReadAll,
+		  NVM_FSM_READALL_PROC_1),
+
+	/* NVM_FSM_READ_INIT */
+	NVM_STATE_WAIT_NV(NVM_ACT_ReadNvBlock, NVM_FSM_READ_READ_DATA, NVM_FSM_READ_INIT),
+
+	/* NVM_FSM_READ_READ_DATA */
+	NVM_STATE_WAIT_NV(NVM_ACT_Nop, NVM_FSM_READ_NV_FINISH, NVM_FSM_READ_READ_DATA),
+
+	/* NVM_FSM_READ_NV_FINISH */
+	NVM_STATE(NVM_EVENT_LAST_RESULT_OK, NVM_ACT_Nop, NVM_FSM_READ_CMP_CRC, NVM_ACT_Nop, NVM_FSM_READ_RETRY),
+
+	/* NVM_FSM_READ_CMP_CRC */
+	NVM_STATE(NVM_EVENT_CRC_MATCH, NVM_ACT_FinishReadBlock, NVM_FSM_FSM_FINISHED, NVM_ACT_Nop, NVM_FSM_READ_RETRY),
+
+	/* NVM_FSM_READ_RETRY */
+	NVM_STATE(NVM_EVENT_READ_RETRY, NVM_ACT_AddTriedTimes, NVM_FSM_READ_INIT, NVM_ACT_Nop, NVM_FSM_READ_RECOV),
+
+	/* NVM_FSM_READ_RECOV */
+	NVM_STATE(NVM_EVENT_REDUNDANT_BLOCK, NvM_ACT_SetupRedundant, NVM_FSM_READ_INIT, NVM_ACT_FinishRestoreRom,
+		  NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_WRITE_INIT */
+	NVM_STATE(NVM_EVENT_TRUE, NVM_ACT_InitWriteBlock, NVM_FSM_CRCCOMPARE, NVM_ACT_Nop, NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_CRCCOMPARE */
+	NVM_STATE(NVM_EVENT_CrcCompare, NVM_ACT_WriteFinshed, NVM_FSM_FSM_FINISHED, NVM_ACT_Nop, NVM_FSM_WRITE_DATA_1),
+
+	/* NVM_FSM_WRITE_DATA_1 */
+	NVM_STATE_WAIT_NV(NVM_ACT_WriteNvBlock, NVM_FSM_WRITE_DATA_2, NVM_FSM_WRITE_DATA_1),
+
+	/* NVM_FSM_WRITE_DATA_2 */
+	NVM_STATE_WAIT_NV(NVM_ACT_Nop, NVM_FSM_WRITE_RETRY, NVM_FSM_WRITE_DATA_2),
+
+	/* NVM_FSM_WRITE_RETRY */
+	NVM_STATE(NVM_EVENT_WRITE_RETRY, NVM_ACT_AddTriedTimes, NVM_FSM_WRITE_DATA_1, NVM_ACT_Nop,
+		  NVM_FSM_WRITE_REDUNDANT),
+
+	/* NVM_FSM_WRITE_REDUNDANT */
+	NVM_STATE(NVM_EVENT_REDUNDANT_BLOCK, NvM_ACT_SetupRedundant, NVM_FSM_WRITE_DATA_1, NVM_ACT_WriteFinshed,
+		  NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_RESTORE_INIT */
+	NVM_STATE(NVM_EVENT_TRUE, NVM_ACT_RestoreBlockDefaults, NVM_FSM_FSM_FINISHED, NVM_ACT_Nop,
+		  NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_WRITEALL_PROC_1 */
+	NVM_STATE(NVM_EVENT_SUBTASK_RUNNING, NVM_ACT_Nop, NVM_FSM_WRITEALL_PROC_1, NVM_ACT_WriteNextBlock,
+		  NVM_FSM_WRITEALL_PROC_2),
+
+	/* NVM_FSM_WRITEALL_PROC_2 */
+	NVM_STATE(NVM_EVENT_WRITEALL_END, NVM_ACT_FinishWriteAll, NVM_FSM_IDLE, NVM_ACT_Nop, NVM_FSM_WRITEALL_PROC_1),
+
+	/* NVM_FSM_READALL_PROC_1 */
+	NVM_STATE(NVM_EVENT_SUBTASK_RUNNING, NVM_ACT_Nop, NVM_FSM_READALL_PROC_1, NVM_ACT_Nop, NVM_FSM_READALL_PROC_2),
+
+	/* NVM_FSM_READALL_PROC_2 */
+	NVM_STATE(NVM_EVENT_LAST_BLOCK_DONE_READALL, NVM_ACT_FinishReadAll, NVM_FSM_IDLE, NVM_ACT_ReadNextBlock,
+		  NVM_FSM_READALL_PROC_1),
+
+	/* NVM_FSM_INVALIDATE_INIT */
+	NVM_STATE_WAIT_NV(NVM_ACT_InitInvalidteBlock, NVM_FSM_INVALIDATE_ING, NVM_FSM_INVALIDATE_INIT),
+
+	/* NVM_FSM_INVALIDATE_ING */
+	NVM_STATE_WAIT_NV(NVM_ACT_Nop, NVM_FSM_INVALIDATE_REDUNDANT, NVM_FSM_INVALIDATE_ING),
+
+	/* NVM_FSM_INVALIDATE_REDUNDANT */
+	NVM_STATE(NVM_EVENT_REDUNDANT_BLOCK, NvM_ACT_SetupRedundant, NVM_FSM_INVALIDATE_INIT, NVM_ACT_FinishBlock,
+		  NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_ERASE_INIT */
+	NVM_STATE_WAIT_NV(NVM_ACT_EraseNvBlock, NVM_FSM_ERASE_ING, NVM_FSM_ERASE_INIT),
+
+	/* NVM_FSM_ERASE_ING */
+	NVM_STATE_WAIT_NV(NVM_ACT_Nop, NVM_FSM_ERASE_REDUNDANT, NVM_FSM_ERASE_ING),
+
+	/* NVM_FSM_ERASE_REDUNDANT */
+	NVM_STATE(NVM_EVENT_REDUNDANT_BLOCK, NvM_ACT_SetupRedundant, NVM_FSM_ERASE_INIT, NVM_ACT_FinishBlock,
+		  NVM_FSM_FSM_FINISHED),
+
+	/* NVM_FSM_FSM_FINISHED */
+	NVM_STATE(NVM_EVENT_TRUE, NVM_ACT_Nop, NVM_FSM_FSM_FINISHED, NVM_ACT_Nop, NVM_FSM_FSM_FINISHED)
+};
 
 #define NVM_STOP_SEC_CONST
 #include "nvm_memmap.h"
@@ -86,8 +196,18 @@ FUNC(void, NVM_CODE) nvm_fsm_deinit(void)
 FUNC(nvm_fsm_state_type, NVM_CODE) nvm_fsm_excute(nvm_fsm_state_type nvm_current_state)
 {
 	nvm_fsm_state_type nvm_ret_state_tloc;
+	nvm_state_action_type change_actions_ptloc = NVM_ACT_Nop;
 	const nvm_state_descr_type *current_state_ptloc = &nvm_state_descr_table_at[nvm_current_state];
-	nvm_ret_state_tloc = current_state_ptloc->change_conditions.next_state;
+
+	if (nvm_fsm_event(current_state_ptloc->change_conditions.queries)) {
+		nvm_ret_state_tloc = current_state_ptloc->change_conditions.next_state;
+		change_actions_ptloc = current_state_ptloc->change_conditions.actions;
+	} else {
+		nvm_ret_state_tloc = current_state_ptloc->final_condition.next_state;
+		change_actions_ptloc = current_state_ptloc->final_condition.actions;
+	}
+
+	nvm_fsm_action(change_actions_ptloc);
 	return nvm_ret_state_tloc;
 }
 

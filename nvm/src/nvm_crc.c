@@ -72,7 +72,19 @@ FUNC(boolean, NVM_CODE)
 nvm_verify_read_crc(const uint8 *buf_ptr, const nvm_block_descriptor_type *block_ptr,
 		    const nvm_admin_block_type *adm_ptr)
 {
+	uint16 crc16 = 0u;
+
+	uint32 crc32 = 0u;
 	boolean checksum_ok = FALSE;
+
+	/* Calculate CRC on the data we just read to RAM. Compare with CRC that is located in NV block */
+	if (block_ptr->block_crc_type == NVM_CRC16_ON) {
+		crc16 = crc_calculate_16(buf_ptr, block_ptr->nv_block_length, 0xffffU, TRUE);
+		checksum_ok = (crc16 == adm_ptr->ram_crc.crc16);
+	} else {
+		crc32 = crc_calculate_32(buf_ptr, block_ptr->nv_block_length, 0xffffffffU, TRUE);
+		checksum_ok = (crc32 == adm_ptr->ram_crc.crc32);
+	}
 	return checksum_ok;
 }
 
