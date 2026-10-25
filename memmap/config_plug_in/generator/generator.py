@@ -64,18 +64,45 @@ def generate_autosar_style_memmap(env_ui, config):
     generate_autosar_memmap_module_header(template, memmap_output_dir, config)
 
 def generate_ld_scripts(env_ui, config):
+    """Generate Memmap linker-script snippets.
+
+    PC_Common / vs20xx ships without ld_scripts_vs20xx.ld.jinja2 (packaging gap);
+    NuttX sim / host builds use board linkscript.ld and do not consume these files.
+    Soft-skip so Memmap header codegen still succeeds for native-PC projects.
+    """
+    compiler_name = config['sys_cfg']['compiler']
+    target_name = config['sys_cfg']['target']
+
+    # Explicit skip for native PC / MSVC-style toolchain (no template in tree).
+    if target_name == 'PC_Common' or compiler_name == 'vs20xx':
+        logger.warning(
+            "Memmap: skip ld script generation for target=%s compiler=%s "
+            "(PC/vs20xx has no ld_scripts template; headers still generated)",
+            target_name, compiler_name)
+        return True
+
+    # Template name matches existing E3650 / default convention.
+    if target_name == 'E3650':
+        template_name = f"ld_scripts_{compiler_name}_e3650.ld.jinja2"
+    else:
+        template_name = f"ld_scripts_{compiler_name}.ld.jinja2"
+
+    template_path = os.path.join(DEFAULT_TEMPLATE_FILE_DIR, template_name)
+    if not os.path.isfile(template_path):
+        # Soft-skip unknown compiler/target combos missing a template (same
+        # packaging-gap class as vs20xx) so Memmap module does not fail hard.
+        logger.warning(
+            "Memmap: skip ld script generation; template not found: %s "
+            "(target=%s compiler=%s; headers still generated)",
+            template_name, target_name, compiler_name)
+        return True
+
     memmap_output_dir = os.path.realpath(os.path.join(config['sys_cfg']['gendata_path'], "scripts"))
     if not os.path.exists(memmap_output_dir):
         os.makedirs(memmap_output_dir)
 
-    compiler_name = config['sys_cfg']['compiler']
-    target_name = config['sys_cfg']['target']
-
     # We provide special jinja2 template to meet platform specific requirements
-    if target_name == 'E3650':
-        template = env_ui.get_template(f"ld_scripts_{compiler_name}_e3650.ld.jinja2")
-    else:
-        template = env_ui.get_template(f"ld_scripts_{compiler_name}.ld.jinja2")
+    template = env_ui.get_template(template_name)
 
     default_ram_scope = ['multi_app_share', 'semishared', 'private']
     default_rom_scope = ['const', 'code']
